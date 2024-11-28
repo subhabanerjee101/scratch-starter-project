@@ -1,6 +1,12 @@
 module.exports = {
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
   darkMode: "class",
-  purge: ["./src/**/*.js"],
-  variants: {},
+  theme: {
+    extend: {
+      colors: {
+        customBlue: "#1e3a8a",
+      },
+    },
+  },
   plugins: [],
 };
