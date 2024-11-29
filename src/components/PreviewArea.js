@@ -7,6 +7,7 @@ const PreviewArea = forwardRef((_, ref) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [angle, setAngle] = useState(0);
   const [commands, setCommands] = useState([]);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   useImperativeHandle(ref, () => ({
     setCommands(newCommands) {
@@ -46,8 +47,13 @@ const PreviewArea = forwardRef((_, ref) => {
     },
   }));
 
-  const executeCommands = () => {
-    commands.forEach((command) => {
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const executeCommands = async () => {
+    if (isExecuting) return;
+    setIsExecuting(true);
+
+    for (const command of commands) {
       switch (command.label) {
         case "Move 10 steps":
           setPosition((prev) => ({
@@ -55,6 +61,7 @@ const PreviewArea = forwardRef((_, ref) => {
             y: prev.y + 10 * Math.sin((angle * Math.PI) / 180),
           }));
           break;
+
         case "Turn ":
           if (command.extraText === "15 degrees") {
             if (command.iconName === "undo") {
@@ -64,10 +71,16 @@ const PreviewArea = forwardRef((_, ref) => {
             }
           }
           break;
+
         default:
+          console.warn("Unknown command:", command.label);
           break;
       }
-    });
+
+      await delay(1000);
+    }
+
+    setIsExecuting(false);
   };
 
   const handleFlagClick = () => {
@@ -114,4 +127,3 @@ const PreviewArea = forwardRef((_, ref) => {
 });
 
 export default PreviewArea;
-
