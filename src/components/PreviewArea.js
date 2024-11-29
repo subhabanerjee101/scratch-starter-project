@@ -42,11 +42,11 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-  const executeCommands = async () => {
+  const executeCommands = async (commandsToExecute) => {
     if (isExecuting) return;
     setIsExecuting(true);
 
-    for (const command of commands) {
+    for (const command of commandsToExecute) {
       if (command.label === "Move 10 steps") {
         setIsTransitioning(true);
         setPosition((prev) => ({
@@ -58,8 +58,6 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
         setAngle((prev) =>
           command.iconName === "undo" ? prev - 15 : prev + 15
         );
-      } else if (command.label === "When this sprite clicked" || command.label === "When ") {
-        continue;
       } else {
         console.warn("Unknown command:", command.label);
       }
@@ -71,18 +69,26 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
     setIsExecuting(false);
   };
 
-  const handleExecute = () => {
-    const actionCommands = commands.filter(
-      (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
-    );
-    if (actionCommands.length) executeCommands();
+  const handleFlagClick = () => {
+    const flagCommands = commands.filter((cmd) => cmd.label === "When ");
+    if (flagCommands.length > 0) {
+      const actionCommands = commands.filter(
+        (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
+      );
+      executeCommands(actionCommands);
+    }
   };
 
   const handleSpriteClick = () => {
     const spriteCommands = commands.filter(
       (cmd) => cmd.label === "When this sprite clicked"
     );
-    if (spriteCommands.length) executeCommands();
+    if (spriteCommands.length > 0) {
+      const actionCommands = commands.filter(
+        (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
+      );
+      executeCommands(actionCommands);
+    }
   };
 
   useEffect(() => {
@@ -100,7 +106,7 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
       className="relative w-full h-full flex flex-col items-center justify-center bg-blue-100"
     >
       <div
-        onClick={handleExecute}
+        onClick={handleFlagClick}
         className="absolute top-4 left-4 bg-green-500 text-white p-2 rounded cursor-pointer flex items-center justify-center"
       >
         <Icon name="flag" size={20} className="text-white" />
