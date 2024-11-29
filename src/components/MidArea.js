@@ -21,6 +21,10 @@ export default function MidArea({ setCommands, reset }) {
     if (reset) setDroppedBlocks([]);
   }, [reset]);
 
+  const deleteBlock = (index) => {
+    setDroppedBlocks((prev) => prev.filter((_, i) => i !== index));
+  };
+
   return (
     <div
       ref={drop}
@@ -35,17 +39,25 @@ export default function MidArea({ setCommands, reset }) {
         droppedBlocks.map((block, index) => (
           <div
             key={index}
-            className="bg-gray-200 p-2 my-2 rounded shadow text-sm text-gray-800 flex items-center"
+            className="bg-gray-200 p-2 my-2 rounded shadow text-sm text-gray-800 flex items-center justify-between"
           >
-            <span className="font-bold mr-2">{block.label}</span>
-            {block.iconName && (
-              <Icon
-                name={block.iconName}
-                size={15}
-                className={`${block.iconClass} mx-2`}
-              />
-            )}
-            <span>{block.extraText}</span>
+            <div className="flex items-center">
+              <span className="font-bold mr-2">{block.label}</span>
+              {block.iconName && (
+                <Icon
+                  name={block.iconName}
+                  size={15}
+                  className={`${block.iconClass} mx-2`}
+                />
+              )}
+              <span>{block.extraText}</span>
+            </div>
+            <button
+              onClick={() => deleteBlock(index)}
+              className="ml-4 bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600"
+            >
+              <Icon name="trash" size={15} className="text-white" />
+            </button>
           </div>
         ))
       )}
