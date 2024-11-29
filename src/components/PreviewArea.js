@@ -8,7 +8,7 @@ const PreviewArea = forwardRef((_, ref) => {
   const [angle, setAngle] = useState(0);
   const [commands, setCommands] = useState([]);
   const [isExecuting, setIsExecuting] = useState(false);
-
+  const [isTransitioning, setIsTransitioning] = useState(false);
   useImperativeHandle(ref, () => ({
     setCommands(newCommands) {
       setCommands(newCommands);
@@ -56,6 +56,7 @@ const PreviewArea = forwardRef((_, ref) => {
     for (const command of commands) {
       switch (command.label) {
         case "Move 10 steps":
+          setIsTransitioning(true);
           setPosition((prev) => ({
             x: prev.x + 10 * Math.cos((angle * Math.PI) / 180),
             y: prev.y + 10 * Math.sin((angle * Math.PI) / 180),
@@ -64,6 +65,7 @@ const PreviewArea = forwardRef((_, ref) => {
 
         case "Turn ":
           if (command.extraText === "15 degrees") {
+            setIsTransitioning(true);
             if (command.iconName === "undo") {
               setAngle((prev) => prev - 15); // Anticlockwise
             } else if (command.iconName === "redo") {
@@ -77,7 +79,8 @@ const PreviewArea = forwardRef((_, ref) => {
           break;
       }
 
-      await delay(1000);
+      await delay(500);
+      setIsTransitioning(false);
     }
 
     setIsExecuting(false);
@@ -116,6 +119,7 @@ const PreviewArea = forwardRef((_, ref) => {
         onClick={handleSpriteClick}
         style={{
           transform: `translate(${position.x}px, ${position.y}px) rotate(${angle}deg)`,
+          transition: isTransitioning ? "transform 0.5s ease-in-out" : "none",
           cursor: isDragging ? "grabbing" : "pointer",
         }}
         className="w-16 h-16"
