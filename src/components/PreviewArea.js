@@ -1,51 +1,44 @@
-import React, { useState, forwardRef, useImperativeHandle } from "react";
+import React, { useState, forwardRef, useImperativeHandle, useEffect } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import CatSprite from "./CatSprite";
 import Icon from "./Icon";
 
-const PreviewArea = forwardRef((_, ref) => {
+const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [angle, setAngle] = useState(0);
   const [commands, setCommands] = useState([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
   useImperativeHandle(ref, () => ({
     setCommands(newCommands) {
       setCommands(newCommands);
     },
   }));
 
-  const [{ isDragging }, drag] = useDrag(() => ({
+  const [{ isDragging }, drag] = useDrag({
     type: "SPRITE",
     item: { type: "SPRITE", currentPosition: position },
-    collect: (monitor) => ({
-      isDragging: !!monitor.isDragging(),
-    }),
-  }));
+    collect: (monitor) => ({ isDragging: !!monitor.isDragging() }),
+  });
 
-  const [, drop] = useDrop(() => ({
+  const [, drop] = useDrop({
     accept: "SPRITE",
-    drop: (item, monitor) => {
+    drop: (_, monitor) => {
       const offset = monitor.getClientOffset();
-      const previewArea = document.querySelector(".relative.w-full.h-full");
-      const previewAreaRect = previewArea.getBoundingClientRect();
+      const previewAreaRect = document
+        .querySelector(".relative.w-full.h-full")
+        .getBoundingClientRect();
 
       if (offset && previewAreaRect) {
-        const centerX = previewAreaRect.width / 2;
-        const centerY = previewAreaRect.height / 2;
-
         const newPos = {
-          x: offset.x - previewAreaRect.left - centerX,
-          y: offset.y - previewAreaRect.top - centerY,
+          x: offset.x - previewAreaRect.left - previewAreaRect.width / 2,
+          y: offset.y - previewAreaRect.top - previewAreaRect.height / 2,
         };
-
-        setPosition({
-          x: newPos.x,
-          y: newPos.y,
-        });
+        setPosition(newPos);
       }
     },
-  }));
+  });
 
   const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -54,29 +47,21 @@ const PreviewArea = forwardRef((_, ref) => {
     setIsExecuting(true);
 
     for (const command of commands) {
-      switch (command.label) {
-        case "Move 10 steps":
-          setIsTransitioning(true);
-          setPosition((prev) => ({
-            x: prev.x + 10 * Math.cos((angle * Math.PI) / 180),
-            y: prev.y + 10 * Math.sin((angle * Math.PI) / 180),
-          }));
-          break;
-
-        case "Turn ":
-          if (command.extraText === "15 degrees") {
-            setIsTransitioning(true);
-            if (command.iconName === "undo") {
-              setAngle((prev) => prev - 15); // Anticlockwise
-            } else if (command.iconName === "redo") {
-              setAngle((prev) => prev + 15); // Clockwise
-            }
-          }
-          break;
-
-        default:
-          console.warn("Unknown command:", command.label);
-          break;
+      if (command.label === "Move 10 steps") {
+        setIsTransitioning(true);
+        setPosition((prev) => ({
+          x: prev.x + 10 * Math.cos((angle * Math.PI) / 180),
+          y: prev.y + 10 * Math.sin((angle * Math.PI) / 180),
+        }));
+      } else if (command.label === "Turn " && command.extraText === "15 degrees") {
+        setIsTransitioning(true);
+        setAngle((prev) =>
+          command.iconName === "undo" ? prev - 15 : prev + 15
+        );
+      } else if (command.label === "When this sprite clicked" || command.label === "When ") {
+        continue;
+      } else {
+        console.warn("Unknown command:", command.label);
       }
 
       await delay(500);
@@ -86,33 +71,47 @@ const PreviewArea = forwardRef((_, ref) => {
     setIsExecuting(false);
   };
 
-  const handleFlagClick = () => {
-    const flagCommands = commands.filter((cmd) => cmd.label === "When ");
-    if (flagCommands.length > 0) {
-      executeCommands();
-    }
+  const handleExecute = () => {
+    const actionCommands = commands.filter(
+      (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
+    );
+    if (actionCommands.length) executeCommands();
   };
 
   const handleSpriteClick = () => {
     const spriteCommands = commands.filter(
       (cmd) => cmd.label === "When this sprite clicked"
     );
-    if (spriteCommands.length > 0) {
-      executeCommands();
-    }
+    if (spriteCommands.length) executeCommands();
   };
+
+  useEffect(() => {
+    if (reset) {
+      setPosition({ x: 0, y: 0 });
+      setAngle(0);
+      setCommands([]);
+      setIsExecuting(false);
+    }
+  }, [reset]);
 
   return (
     <div
       ref={drop}
-      className="relative w-full h-full flex items-center justify-center bg-blue-100"
+      className="relative w-full h-full flex flex-col items-center justify-center bg-blue-100"
     >
       <div
-        onClick={handleFlagClick}
+        onClick={handleExecute}
         className="absolute top-4 left-4 bg-green-500 text-white p-2 rounded cursor-pointer flex items-center justify-center"
       >
         <Icon name="flag" size={20} className="text-white" />
       </div>
+
+      <button
+        onClick={handleReset}
+        className="absolute top-4 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-md hover:bg-red-600"
+      >
+        <Icon name="redo" size={20} className="text-white" />
+      </button>
 
       <div
         ref={drag}
