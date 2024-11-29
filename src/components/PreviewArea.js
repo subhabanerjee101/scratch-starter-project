@@ -1,4 +1,4 @@
-import React, { useState, forwardRef, useImperativeHandle, useEffect } from "react";
+import React, { useState, forwardRef, useImperativeHandle, useEffect, useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
 import CatSprite from "./CatSprite";
 import Icon from "./Icon";
@@ -6,9 +6,14 @@ import Icon from "./Icon";
 const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [angle, setAngle] = useState(0);
+  const angleRef = useRef(0);
   const [commands, setCommands] = useState([]);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const cancellationRef = useRef(false);
+
+  useEffect(() => {
+    angleRef.current = angle;
+  }, [angle]);
 
   useImperativeHandle(ref, () => ({
     setCommands(newCommands) {
@@ -31,68 +36,105 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
         .getBoundingClientRect();
 
       if (offset && previewAreaRect) {
-        const newPos = {
-          x: offset.x - previewAreaRect.left - previewAreaRect.width / 2,
-          y: offset.y - previewAreaRect.top - previewAreaRect.height / 2,
-        };
-        setPosition(newPos);
+        const centerX = previewAreaRect.width / 2;
+        const centerY = previewAreaRect.height / 2;
+
+        setPosition({
+          x: offset.x - previewAreaRect.left - centerX,
+          y: offset.y - previewAreaRect.top - centerY,
+        });
       }
     },
   });
 
-  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-  const executeCommands = async (commandsToExecute) => {
+  const executeCommandsSequentially = (commandsToExecute, isRepeated = false) => {
     if (isExecuting) return;
     setIsExecuting(true);
+    cancellationRef.current = false;
 
-    for (const command of commandsToExecute) {
-      if (command.label === "Move 10 steps") {
-        setIsTransitioning(true);
-        setPosition((prev) => ({
-          x: prev.x + 10 * Math.cos((angle * Math.PI) / 180),
-          y: prev.y + 10 * Math.sin((angle * Math.PI) / 180),
-        }));
-      } else if (command.label === "Turn " && command.extraText === "15 degrees") {
-        setIsTransitioning(true);
-        setAngle((prev) =>
-          command.iconName === "undo" ? prev - 15 : prev + 15
-        );
-      } else {
-        console.warn("Unknown command:", command.label);
+    const executeStep = (index) => {
+      if (cancellationRef.current) {
+        setIsExecuting(false);
+        return;
       }
 
-      await delay(500);
-      setIsTransitioning(false);
-    }
+      if (index >= commandsToExecute.length) {
+        if (isRepeated && !cancellationRef.current) {
+          setTimeout(() => executeStep(0), 600);
+        } else {
+          setIsExecuting(false);
+        }
+        return;
+      }
 
-    setIsExecuting(false);
+      const command = commandsToExecute[index];
+      processCommand(command);
+      setTimeout(() => executeStep(index + 1), 600);
+    };
+
+    executeStep(0);
   };
 
-const handleFlagClick = () => {
-  const flagCommands = commands.filter((cmd) => cmd.label === "When ");
-  if (flagCommands.length > 0) {
-    const actionCommands = commands.filter(
-      (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
-    );
-    executeCommands(actionCommands);
-  }
-};
+  const processCommand = (command) => {
+    if (command.label.includes("Move") && command.label.includes("steps")) {
+      const steps = parseInt(command.label.split(" ")[1], 10);
+      if (!isNaN(steps)) {
+        setPosition((prev) => ({
+          x: prev.x + steps * Math.cos((angleRef.current * Math.PI) / 180),
+          y: prev.y + steps * Math.sin((angleRef.current * Math.PI) / 180),
+        }));
+      }
+    } else if (command.label.includes("Turn") && command.extraText?.includes("degrees")) {
+      const degrees = parseInt(command.extraText.split(" ")[0], 10);
+      if (!isNaN(degrees)) {
+        setAngle((prev) =>
+          command.iconName === "undo" ? prev - degrees : prev + degrees
+        );
+        angleRef.current += command.iconName === "undo" ? -degrees : degrees;
+      }
+    } else if (command.label.includes("Go to")) {
+      const targetX = parseInt(command.x, 10);
+      const targetY = parseInt(command.y, 10);
+      if (!isNaN(targetX) && !isNaN(targetY)) {
+        setPosition({ x: targetX, y: targetY });
+      }
+    }
+  };
 
-const handleSpriteClick = () => {
-  const spriteCommands = commands.filter(
-    (cmd) => cmd.label === "When this sprite clicked"
-  );
-  if (spriteCommands.length > 0) {
+  const handleFlagClick = () => {
+    if (!commands.some((cmd) => cmd.label === "When ")) return;
+
     const actionCommands = commands.filter(
-      (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
+      (cmd) => cmd.label !== "When " && cmd.label !== "Repeat Animation"
     );
-    executeCommands(actionCommands);
-  }
-};
+
+    if (commands.some((cmd) => cmd.label === "Repeat Animation")) {
+      executeCommandsSequentially(actionCommands, true);
+    } else {
+      executeCommandsSequentially(actionCommands);
+    }
+  };
+
+  const handleSpriteClick = () => {
+    if (!commands.some((cmd) => cmd.label === "When this sprite clicked")) return;
+
+    const actionCommands = commands.filter(
+      (cmd) =>
+        cmd.label !== "When " &&
+        cmd.label !== "When this sprite clicked" &&
+        cmd.label !== "Repeat Animation"
+    );
+
+    if (commands.some((cmd) => cmd.label === "Repeat Animation")) {
+      executeCommandsSequentially(actionCommands, true);
+    } else {
+      executeCommandsSequentially(actionCommands);
+    }
+  };
 
   useEffect(() => {
     if (reset) {
+      cancellationRef.current = true;
       setPosition({ x: 0, y: 0 });
       setAngle(0);
       setCommands([]);
@@ -124,7 +166,7 @@ const handleSpriteClick = () => {
         onClick={handleSpriteClick}
         style={{
           transform: `translate(${position.x}px, ${position.y}px) rotate(${angle}deg)`,
-          transition: isTransitioning ? "transform 0.5s ease-in-out" : "none",
+          transition: isExecuting ? "transform 0.6s ease-in-out" : "none",
           cursor: isDragging ? "grabbing" : "pointer",
         }}
         className="w-16 h-16"
@@ -132,7 +174,6 @@ const handleSpriteClick = () => {
         <CatSprite />
       </div>
 
-      {/* Status Bar */}
       <div className="absolute bottom-4 bg-white p-3 rounded shadow-md flex items-center space-x-4 border">
         <div className="flex items-center">
           <span className="font-bold mr-2">Sprite:</span>

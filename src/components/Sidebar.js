@@ -2,10 +2,10 @@ import React from "react";
 import { useDrag } from "react-dnd";
 import Icon from "./Icon";
 
-const DraggableBlock = ({ label, iconName, iconClass, extraText }) => {
+const DraggableBlock = ({ label, iconName, iconClass, extraText, x, y }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: "BLOCK",
-    item: { label, iconName, iconClass, extraText },
+    item: { label, iconName, iconClass, extraText, x, y },
     collect: (monitor) => ({
       isDragging: !!monitor.isDragging(),
     }),
@@ -52,6 +52,9 @@ export default function Sidebar() {
         iconClass="text-white"
         extraText="15 degrees"
       />
+      <DraggableBlock label="Go to x: 50 y: 50" x={50} y={50} />
+      <div className="font-bold">{"Control"}</div>
+      <DraggableBlock label="Repeat Animation" />
     </div>
   );
 }
