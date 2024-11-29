@@ -23,7 +23,7 @@ export default function App() {
       <div className="bg-blue-100 pt-6 font-sans h-screen flex flex-row overflow-hidden">
         <div className="flex-1 flex flex-row bg-white border-t border-r border-gray-200 rounded-tr-xl mr-2">
           <Sidebar />
-          <MidArea setCommands={setCommands} reset={reset} />
+          <MidArea setCommands={setCommands} />
         </div>
         <div className="w-1/3 flex bg-white border-t border-l border-gray-200 rounded-tl-xl ml-2">
           <PreviewArea ref={previewAreaRef} reset={reset} handleReset={handleReset} />

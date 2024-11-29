@@ -69,27 +69,27 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
     setIsExecuting(false);
   };
 
-  const handleFlagClick = () => {
-    const flagCommands = commands.filter((cmd) => cmd.label === "When ");
-    if (flagCommands.length > 0) {
-      const actionCommands = commands.filter(
-        (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
-      );
-      executeCommands(actionCommands);
-    }
-  };
-
-  const handleSpriteClick = () => {
-    const spriteCommands = commands.filter(
-      (cmd) => cmd.label === "When this sprite clicked"
+const handleFlagClick = () => {
+  const flagCommands = commands.filter((cmd) => cmd.label === "When ");
+  if (flagCommands.length > 0) {
+    const actionCommands = commands.filter(
+      (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
     );
-    if (spriteCommands.length > 0) {
-      const actionCommands = commands.filter(
-        (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
-      );
-      executeCommands(actionCommands);
-    }
-  };
+    executeCommands(actionCommands);
+  }
+};
+
+const handleSpriteClick = () => {
+  const spriteCommands = commands.filter(
+    (cmd) => cmd.label === "When this sprite clicked"
+  );
+  if (spriteCommands.length > 0) {
+    const actionCommands = commands.filter(
+      (cmd) => cmd.label !== "When " && cmd.label !== "When this sprite clicked"
+    );
+    executeCommands(actionCommands);
+  }
+};
 
   useEffect(() => {
     if (reset) {
@@ -130,6 +130,22 @@ const PreviewArea = forwardRef(({ reset, handleReset }, ref) => {
         className="w-16 h-16"
       >
         <CatSprite />
+      </div>
+
+      {/* Status Bar */}
+      <div className="absolute bottom-4 bg-white p-3 rounded shadow-md flex items-center space-x-4 border">
+        <div className="flex items-center">
+          <span className="font-bold mr-2">Sprite:</span>
+          <span>Cat</span>
+        </div>
+        <div className="flex items-center">
+          <span className="font-bold mr-2">X:</span>
+          <span>{position.x.toFixed(2)}</span>
+        </div>
+        <div className="flex items-center">
+          <span className="font-bold mr-2">Y:</span>
+          <span>{position.y.toFixed(2)}</span>
+        </div>
       </div>
     </div>
   );

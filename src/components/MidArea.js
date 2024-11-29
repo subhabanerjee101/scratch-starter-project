@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useDrop } from "react-dnd";
 import Icon from "./Icon";
 
-export default function MidArea({ setCommands, reset }) {
+export default function MidArea({ setCommands }) {
   const [droppedBlocks, setDroppedBlocks] = useState([]);
 
   const [{ isOver }, drop] = useDrop({
@@ -16,10 +16,6 @@ export default function MidArea({ setCommands, reset }) {
   useEffect(() => {
     setCommands(droppedBlocks);
   }, [droppedBlocks, setCommands]);
-
-  useEffect(() => {
-    if (reset) setDroppedBlocks([]);
-  }, [reset]);
 
   const deleteBlock = (index) => {
     setDroppedBlocks((prev) => prev.filter((_, i) => i !== index));
