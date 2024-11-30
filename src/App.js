@@ -4,6 +4,7 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import Sidebar from "./components/Sidebar";
 import MidArea from "./components/MidArea";
 import PreviewArea from "./components/PreviewArea";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 export default function App() {
   const previewAreaRef = useRef();
@@ -15,8 +16,8 @@ export default function App() {
   ]);
 
   const [sprites, setSprites] = useState([
-    { id: 1, name: "cat1", icon: "cat", assignedActionId: null },
-    { id: 2, name: "cat2", icon: "cat", assignedActionId: null },
+    { id: 1, name: "Mouse 1", icon: "cat", assignedActionId: 1 },
+    { id: 2, name: "Ball 2", icon: "cat", assignedActionId: 2 },
   ]);
 
   const setCommandsForActionSection = (id, newCommands) => {
@@ -59,7 +60,7 @@ export default function App() {
     const newSpriteId = sprites.length + 1;
     setSprites((prevSprites) => [
       ...prevSprites,
-      { id: newSpriteId, name: `cat${newSpriteId}`, icon: "cat", assignedActionId: null },
+      { id: newSpriteId, name: `cat ${newSpriteId}`, icon: "cat", assignedActionId: null },
     ]);
   };
 
@@ -88,15 +89,17 @@ export default function App() {
           </div>
 
           <div className="w-1/2 bg-gradient-to-b from-white to-gray-100 p-6 shadow-lg rounded-tr-lg">
-            <PreviewArea
-              ref={previewAreaRef}
-              reset={reset}
-              handleReset={handleReset}
-              sprites={sprites}
-              assignActionToSprite={assignActionToSprite}
-              handleAddSprite={handleAddSprite}
-              actionSections={actionSections}
-            />
+            <ErrorBoundary>
+              <PreviewArea
+                ref={previewAreaRef}
+                reset={reset}
+                handleReset={handleReset}
+                sprites={sprites}
+                assignActionToSprite={assignActionToSprite}
+                handleAddSprite={handleAddSprite}
+                actionSections={actionSections}
+              />
+            </ErrorBoundary>
           </div>
         </div>
       </div>
