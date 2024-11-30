@@ -14,46 +14,39 @@ const DraggableBlock = ({ label, iconName, iconClass, extraText, x, y }) => {
   return (
     <div
       ref={drag}
-      className={`flex flex-row flex-wrap bg-blue-500 text-white px-2 py-1 my-2 text-sm cursor-pointer ${
+      className={`flex items-center bg-blue-500 hover:bg-blue-400 text-white px-4 py-2 my-2 text-sm cursor-pointer rounded-lg shadow-md transition ${
         isDragging ? "opacity-50" : "opacity-100"
       }`}
     >
       {label}
       {iconName && (
-        <Icon name={iconName} size={15} className={`${iconClass} mx-2`} />
+        <Icon name={iconName} size={15} className={`${iconClass} ml-2`} />
       )}
-      {extraText && extraText}
+      {extraText && <span className="ml-2 text-xs">{extraText}</span>}
     </div>
   );
 };
 
 export default function Sidebar() {
   return (
-    <div className="w-60 flex-none h-full overflow-y-auto flex flex-col items-start p-2 border-r border-gray-200">
-      <div className="font-bold">{"Events"}</div>
-      <DraggableBlock
-        label="When "
-        iconName="flag"
-        iconClass="text-green-600"
-        extraText="clicked"
-      />
-      <DraggableBlock label="When this sprite clicked" />
-      <div className="font-bold">{"Motion"}</div>
+    <div className="w-full h-full overflow-y-auto flex flex-col items-start p-4 border-r bg-gradient-to-b from-gray-200 to-gray-300 shadow-lg rounded-lg">
+      <div className="font-bold text-lg text-gray-800 mb-4">{"Motion"}</div>
       <DraggableBlock label="Move 10 steps" />
       <DraggableBlock
         label="Turn "
         iconName="undo"
-        iconClass="text-white"
+        iconClass="text-gray-800"
         extraText="15 degrees"
       />
       <DraggableBlock
         label="Turn "
         iconName="redo"
-        iconClass="text-white"
+        iconClass="text-gray-800"
         extraText="15 degrees"
       />
       <DraggableBlock label="Go to x: 50 y: 50" x={50} y={50} />
-      <div className="font-bold">{"Control"}</div>
+
+      <div className="font-bold text-lg text-gray-800 mt-6 mb-4">{"Control"}</div>
       <DraggableBlock label="Repeat Animation" />
     </div>
   );
