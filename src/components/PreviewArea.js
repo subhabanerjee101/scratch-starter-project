@@ -12,7 +12,7 @@ const spriteComponents = {
   Mouse: MouseSprite,
 };
 
-const PreviewArea = forwardRef(({ reset, handleReset, actionSections}, ref) => {
+const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => {
   const [sprites, setSprites] = useState([]);
   const [selectedSpriteId, setSelectedSpriteId] = useState(null);
   const [showActionDropdown, setShowActionDropdown] = useState(null);
@@ -251,6 +251,24 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections}, ref) => {
       });
     }, 1000);
   };
+
+  useEffect(() => {
+    setSprites((prevSprites) =>
+      prevSprites.map((sprite) => {
+        if (sprite.assignedAction) {
+          const updatedAction = actionSections.find(
+            (action) => action.id === sprite.assignedAction
+          );
+          if (updatedAction) {
+            if (JSON.stringify(sprite.commands) !== JSON.stringify(updatedAction.commands)) {
+              return { ...sprite, commands: updatedAction.commands || [] };
+            }
+          }
+        }
+        return sprite;
+      })
+    );
+  }, [actionSections]);
 
   useEffect(() => {
     const detectCollisions = () => {
