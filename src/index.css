@@ -25,4 +25,17 @@
   .w-16.h-16:active {
     cursor: grabbing;
   }
+
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.2);
+    }
+  }
+  
+  .animate-pulse {
+    animation: pulse 0.5s ease-in-out;
+  }
 }

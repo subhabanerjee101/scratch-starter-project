@@ -18,7 +18,6 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
   const [showActionDropdown, setShowActionDropdown] = useState(null);
   const [showSpriteMenu, setShowSpriteMenu] = useState(false);
   const [collisionHandled, setCollisionHandled] = useState(new Set());
-  const [previousPositions, setPreviousPositions] = useState({});
   const cancellationRefs = useRef({});
   const selectedSprite = sprites.find((sprite) => sprite.id === selectedSpriteId);
 
@@ -37,11 +36,9 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
   const handleSpriteDrop = (spriteId, monitor) => {
     const offset = monitor.getClientOffset();
     const previewAreaRect = document.querySelector(".preview-area").getBoundingClientRect();
-
     if (offset && previewAreaRect) {
       const centerX = previewAreaRect.width / 2;
       const centerY = previewAreaRect.height / 2;
-
       setSprites((prevSprites) =>
         prevSprites.map((sprite) =>
           sprite.id === spriteId
@@ -83,21 +80,18 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     ) {
       return false;
     }
-
     const rect1 = {
       left: sprite1.position.x,
       right: sprite1.position.x + 50,
       top: sprite1.position.y,
       bottom: sprite1.position.y + 50,
     };
-
     const rect2 = {
       left: sprite2.position.x,
       right: sprite2.position.x + 50,
       top: sprite2.position.y,
       bottom: sprite2.position.y + 50,
     };
-
     return !(
       rect1.right < rect2.left ||
       rect1.left > rect2.right ||
@@ -106,55 +100,28 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     );
   };
 
-  const executeCommandsSequentially = (spriteId, commands) => {
-
+  const executeCommandsSequentially = async (spriteId, commands) => {
     const sprite = sprites.find((sprite) => sprite.id === spriteId);
-    if (!sprite || !commands || commands.length === 0 || sprite.isExecuting) return;
-
+    if (!sprite || !commands || commands.length === 0) return;
+    cancellationRefs.current[spriteId] = false;
     setSprites((prevSprites) =>
       prevSprites.map((s) =>
         s.id === spriteId ? { ...s, isExecuting: true } : s
       )
     );
-
-    cancellationRefs.current[spriteId] = false;
-
-    const executeStep = (index) => {
-      const updatedSprite = sprites.find((sprite) => sprite.id === spriteId);
-      if (!updatedSprite) return;
-
-      if (cancellationRefs.current[spriteId]) {
-        setSprites((prevSprites) =>
-          prevSprites.map((s) =>
-            s.id === spriteId ? { ...s, isExecuting: false } : s
-          )
-        );
-        return;
-      }
-
-      if (index >= commands.length) {
-        const repeatAnimation = commands.some((cmd) => cmd.label === "Repeat Animation");
-        if (repeatAnimation) {
-          console.log(`Repeating animation for sprite ${spriteId}`);
-          executeStep(0);
-        } else {
-          setSprites((prevSprites) =>
-            prevSprites.map((s) =>
-              s.id === spriteId ? { ...s, isExecuting: false } : s
-            )
-          );
-        }
-        return;
-      }
-
+    for (let index = 0; !cancellationRefs.current[spriteId]; index = (index + 1) % commands.length) {
       const command = commands[index];
-
       processCommand(command, spriteId);
-
-      setTimeout(() => executeStep(index + 1), 300);
-    };
-
-    executeStep(0);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      if (command.label === "Repeat Animation") {
+        index = -1;
+      }
+    }
+    setSprites((prevSprites) =>
+      prevSprites.map((s) =>
+        s.id === spriteId ? { ...s, isExecuting: false } : s
+      )
+    );
   };
 
   const processCommand = (command, spriteId) => {
@@ -182,7 +149,7 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
                       : sprite.angle + degrees;
                   return {
                     ...sprite,
-                    angle: newAngle % 360,
+                    angle: newAngle,
                   };
                 }
               } else if (command.label.includes("Go to")) {
@@ -212,8 +179,6 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
 
   const handlePlayClick = () => {
     sprites.forEach((sprite) => {
-      console.log(`Commands for ${sprite.name}:`, sprite.commands);
-
       if (sprite.commands && sprite.commands.length > 0) {
         executeCommandsSequentially(sprite.id, sprite.commands);
       }
@@ -222,14 +187,10 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
 
   const assignActionToSprite = (spriteId, actionId) => {
     const action = actionSections.find((action) => action.id === actionId);
-
     if (!action) {
       console.error(`Action with ID ${actionId} not found.`);
       return;
     }
-
-    console.log(`Assigning action to sprite ${spriteId}:`, action);
-
     setSprites((prevSprites) =>
       prevSprites.map((sprite) =>
         sprite.id === spriteId
@@ -237,66 +198,75 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
           : sprite
       )
     );
-
     setShowActionDropdown(null);
   };
 
   const handleCollision = (sprite1, sprite2) => {
     const collisionKey = `${Math.min(sprite1.id, sprite2.id)}-${Math.max(sprite1.id, sprite2.id)}`;
-    if (collisionHandled.has(collisionKey)) {
-      return; // If collision has been handled, exit
-    }
-  
-    console.log(`Collision detected between ${sprite1.name} and ${sprite2.name}`);
-  
-    const areAnimationsSwapped = sprite1.assignedAction !== sprite2.assignedAction;
-  
-    if (!areAnimationsSwapped) {
-      const action1 = sprite1.assignedAction;
-      const action2 = sprite2.assignedAction;
-  
+    setSprites((prevSprites) =>
+      prevSprites.map((sprite) => {
+        if (sprite.id === sprite1.id || sprite.id === sprite2.id) {
+          return { ...sprite, isColliding: true };
+        }
+        return sprite;
+      })
+    );
+    setTimeout(() => {
       setSprites((prevSprites) =>
-        prevSprites.map((sprite) => {
-          if (sprite.id === sprite1.id) {
-            return { ...sprite, assignedAction: action2 };
-          }
-          if (sprite.id === sprite2.id) {
-            return { ...sprite, assignedAction: action1 };
-          }
-          return sprite;
-        })
+        prevSprites.map((sprite) => ({ ...sprite, isColliding: false }))
       );
-  
-      setSprites((prevSprites) =>
-        prevSprites.map((sprite) => ({ ...sprite, isExecuting: false }))
-      );
-      executeCommandsSequentially(sprite1.id, sprite1.commands);
-      executeCommandsSequentially(sprite2.id, sprite2.commands);
-    }
-  
-    collisionHandled.add(collisionKey); 
+    }, 1000);
+    cancellationRefs.current[sprite1.id] = true;
+    cancellationRefs.current[sprite2.id] = true;
+    const swappedCommands1 = [...sprite2.commands];
+    const swappedCommands2 = [...sprite1.commands];
+    setSprites((prevSprites) =>
+      prevSprites.map((sprite) => {
+        if (sprite.id === sprite1.id) {
+          return { ...sprite, isExecuting: false, commands: swappedCommands1 };
+        }
+        if (sprite.id === sprite2.id) {
+          return { ...sprite, isExecuting: false, commands: swappedCommands2 };
+        }
+        return sprite;
+      })
+    );
+    setTimeout(() => {
+      executeCommandsSequentially(sprite1.id, swappedCommands1);
+      executeCommandsSequentially(sprite2.id, swappedCommands2);
+    }, 500);
+    setTimeout(() => {
+      setCollisionHandled((prev) => {
+        const updatedSet = new Set(prev);
+        updatedSet.delete(collisionKey);
+        return updatedSet;
+      });
+    }, 1000);
   };
-  
 
   useEffect(() => {
-    const newPositions = { ...previousPositions };
-    sprites.forEach((sprite) => {
-      newPositions[sprite.id] = sprite.position;
-    });
-
-    sprites.forEach((sprite1) => {
-      sprites.forEach((sprite2) => {
-        if (sprite1.id !== sprite2.id && isColliding(sprite1, sprite2)) {
-          const collisionKey = `${sprite1.id}-${sprite2.id}`;
-          if (!collisionHandled.has(collisionKey)) {
-            handleCollision(sprite1, sprite2);
+    const detectCollisions = () => {
+      const newCollisionPairs = [];
+      sprites.forEach((sprite1, i) => {
+        sprites.slice(i + 1).forEach((sprite2) => {
+          if (isColliding(sprite1, sprite2)) {
+            const collisionKey = `${Math.min(sprite1.id, sprite2.id)}-${Math.max(sprite1.id, sprite2.id)}`;
+            if (!collisionHandled.has(collisionKey)) {
+              newCollisionPairs.push({ sprite1, sprite2, collisionKey });
+            }
           }
-        }
+        });
       });
-    });
-
-    setPreviousPositions(newPositions);
-  }, [sprites, collisionHandled]);
+      newCollisionPairs.forEach(({ sprite1, sprite2, collisionKey }) => {
+        setCollisionHandled((prev) => new Set(prev).add(collisionKey));
+        handleCollision(sprite1, sprite2);
+      });
+    };
+  
+    if (sprites.length > 1) {
+      detectCollisions();
+    }
+  }, [sprites]);
 
   useEffect(() => {
     if (reset) {
@@ -309,10 +279,11 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
           position: { x: 0, y: 0 },
           angle: 0,
           isExecuting: false,
+          assignedAction: null,
+          commands: [],
         }))
       );
       setCollisionHandled(new Set());
-      setPreviousPositions({});
     }
   }, [reset]);
 
@@ -350,7 +321,15 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
             <DraggableSprite
               key={sprite.id}
               sprite={sprite}
-              component={<SpriteComponent />}
+              component={
+                <div
+                  className={`relative ${
+                    sprite.isColliding ? "animate-pulse" : ""
+                  }`}
+                >
+                  <SpriteComponent />
+                </div>
+              }
               onSelect={setSelectedSpriteId}
             />
           );
