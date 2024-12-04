@@ -12,7 +12,7 @@ const spriteComponents = {
   Mouse: MouseSprite,
 };
 
-const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => {
+const PreviewArea = forwardRef(({ reset, handleReset, actionSections}, ref) => {
   const [sprites, setSprites] = useState([]);
   const [selectedSpriteId, setSelectedSpriteId] = useState(null);
   const [showActionDropdown, setShowActionDropdown] = useState(null);
@@ -109,12 +109,20 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
         s.id === spriteId ? { ...s, isExecuting: true } : s
       )
     );
-    for (let index = 0; !cancellationRefs.current[spriteId]; index = (index + 1) % commands.length) {
+    let index = 0;
+    while (!cancellationRefs.current[spriteId]) {
       const command = commands[index];
       processCommand(command, spriteId);
       await new Promise((resolve) => setTimeout(resolve, 300));
       if (command.label === "Repeat Animation") {
-        index = -1;
+        const hasRepeatTile = commands.some((cmd) => cmd.label === "Repeat Animation");
+        if (!hasRepeatTile) {
+          break;
+        }
+      }
+      index = (index + 1) % commands.length;
+      if (!commands.some((cmd) => cmd.label === "Repeat Animation")) {
+        break;
       }
     }
     setSprites((prevSprites) =>
@@ -399,8 +407,17 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
                 {actionSections.map((action, index) => (
                   <button
                     key={index}
-                    className="block w-full text-left px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 transition"
-                    onClick={() => assignActionToSprite(sprite.id, action.id)}
+                    className={`block w-full text-left px-2 py-1 text-xs transition ${
+                      action.commands && action.commands.length > 0
+                        ? "text-gray-700 hover:bg-gray-100"
+                        : "text-gray-400 cursor-not-allowed"
+                    }`}
+                    onClick={() => {
+                      if (action.commands && action.commands.length > 0) {
+                        assignActionToSprite(sprite.id, action.id);
+                      }
+                    }}
+                    disabled={!action.commands || action.commands.length === 0}
                   >
                     {action.name}
                   </button>
