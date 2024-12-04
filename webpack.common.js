@@ -1,6 +1,7 @@
 const path = require("path");
 const MiniCssExtractPlugin = require("mini-css-extract-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const webpack = require("webpack");
 
 module.exports = {
   entry: {
@@ -9,6 +10,7 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, "build"),
     filename: "app.js",
+    publicPath: "/",
     clean: true,
   },
   module: {
@@ -36,7 +38,7 @@ module.exports = {
         ],
       },
       {
-        test: /\.(js|jsx)$/,
+        test: /\.(js|jsx)$/i,
         exclude: /node_modules/,
         use: {
           loader: "babel-loader",
@@ -48,6 +50,9 @@ module.exports = {
       {
         test: /\.(png|jpe?g|gif|svg)$/i,
         type: "asset/resource",
+        generator: {
+          filename: "assets/[name][ext][query]",
+        },
       },
     ],
   },
@@ -56,6 +61,11 @@ module.exports = {
     new HtmlWebpackPlugin({
       template: "./public/index.html",
       filename: "index.html",
+    }),
+    new webpack.DefinePlugin({
+      "process.env": JSON.stringify({
+        NODE_ENV: "production",
+      }),
     }),
   ],
   resolve: {
