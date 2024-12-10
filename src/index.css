@@ -38,4 +38,14 @@
   .animate-pulse {
     animation: pulse 0.5s ease-in-out;
   }
+
+  .preview-area {
+    animation: flash 0.5s ease-in-out;
+  }
+
+  @keyframes flash {
+    0% { background-color: #f3f4f6; }
+    50% { background-color: #cbd5e1; }
+    100% { background-color: #f3f4f6; }
+  }
 }

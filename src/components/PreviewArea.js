@@ -58,7 +58,7 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
   const addSprite = (spriteType) => {
     const existingCount = sprites.filter((sprite) => sprite.type === spriteType).length;
     const newSprite = {
-      id: sprites.length + 1,
+      id: Date.now(),
       name: `${spriteType} ${existingCount + 1}`,
       type: spriteType,
       position: { x: 0, y: 0 },
@@ -68,8 +68,10 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
       commands: [],
     };
     setSprites((prevSprites) => [...prevSprites, newSprite]);
+    cancellationRefs.current[newSprite.id] = false;
     setShowSpriteMenu(false);
   };
+  
 
   const isColliding = (sprite1, sprite2) => {
     if (
@@ -102,101 +104,116 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
 
   const executeCommandsSequentially = async (spriteId, commands) => {
     const sprite = sprites.find((sprite) => sprite.id === spriteId);
-    if (!sprite || !commands || commands.length === 0) return;
+    if (!sprite || !commands || commands.length === 0) {
+        return;
+    }
     cancellationRefs.current[spriteId] = false;
     setSprites((prevSprites) =>
-      prevSprites.map((s) =>
-        s.id === spriteId ? { ...s, isExecuting: true } : s
-      )
+        prevSprites.map((s) =>
+            s.id === spriteId ? { ...s, isExecuting: true } : s
+        )
     );
     let index = 0;
     while (!cancellationRefs.current[spriteId]) {
-      const command = commands[index];
-      processCommand(command, spriteId);
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      if (command.label === "Repeat Animation") {
+        const command = commands[index];
+        processCommand(command, spriteId);
+        await new Promise((resolve) => setTimeout(resolve, 300));
         const hasRepeatTile = commands.some((cmd) => cmd.label === "Repeat Animation");
-        if (!hasRepeatTile) {
-          break;
+        if (command.label === "Repeat Animation" && !hasRepeatTile) {
+            break;
         }
-      }
-      index = (index + 1) % commands.length;
-      if (!commands.some((cmd) => cmd.label === "Repeat Animation")) {
-        break;
-      }
+        index = (index + 1) % commands.length;
+        if (!hasRepeatTile && index === 0) {
+            break;
+        }
     }
     setSprites((prevSprites) =>
-      prevSprites.map((s) =>
-        s.id === spriteId ? { ...s, isExecuting: false } : s
-      )
+        prevSprites.map((s) =>
+            s.id === spriteId ? { ...s, isExecuting: false } : s
+        )
     );
   };
 
   const processCommand = (command, spriteId) => {
     setSprites((prevSprites) =>
-      prevSprites.map((sprite) =>
-        sprite.id === spriteId
-          ? (() => {
-              if (command.label.includes("Move") && command.label.includes("steps")) {
-                const steps = parseInt(command.label.split(" ")[1], 10);
-                if (!isNaN(steps)) {
-                  return {
-                    ...sprite,
-                    position: {
-                      x: sprite.position.x + steps * Math.cos((sprite.angle * Math.PI) / 180),
-                      y: sprite.position.y + steps * Math.sin((sprite.angle * Math.PI) / 180),
-                    },
-                  };
-                }
-              } else if (command.label.includes("Turn") && command.extraText?.includes("degrees")) {
-                const degrees = parseInt(command.extraText.split(" ")[0], 10);
-                if (!isNaN(degrees)) {
-                  const newAngle =
-                    command.iconName === "undo"
-                      ? sprite.angle - degrees
-                      : sprite.angle + degrees;
-                  return {
-                    ...sprite,
-                    angle: newAngle,
-                  };
-                }
-              } else if (command.label.includes("Go to")) {
-                const targetX = parseInt(command.x, 10);
-                const targetY = parseInt(command.y, 10);
-                if (!isNaN(targetX) && !isNaN(targetY)) {
-                  return {
-                    ...sprite,
-                    position: { x: targetX, y: targetY },
-                  };
-                }
-              }
-              return sprite;
-            })()
-          : sprite
-      )
+        prevSprites.map((sprite) => {
+            if (sprite.id === spriteId) {
+                const updatedSprite = (() => {
+                    if (command.label.includes("Move") && command.label.includes("steps")) {
+                        const steps = parseInt(command.label.split(" ")[1], 10);
+                        if (!isNaN(steps)) {
+                            return {
+                                ...sprite,
+                                position: {
+                                    x: sprite.position.x + steps * Math.cos((sprite.angle * Math.PI) / 180),
+                                    y: sprite.position.y + steps * Math.sin((sprite.angle * Math.PI) / 180),
+                                },
+                            };
+                        }
+                    } else if (command.label.includes("Turn") && command.extraText?.includes("degrees")) {
+                        const degrees = parseInt(command.extraText.split(" ")[0], 10);
+                        if (!isNaN(degrees)) {
+                            const newAngle =
+                                command.iconName === "undo"
+                                    ? sprite.angle - degrees
+                                    : sprite.angle + degrees;
+                            return { ...sprite, angle: newAngle };
+                        }
+                    } else if (command.label.includes("Go to")) {
+                        const targetX = parseInt(command.x, 10);
+                        const targetY = parseInt(command.y, 10);
+                        if (!isNaN(targetX) && !isNaN(targetY)) {
+                            return { ...sprite, position: { x: targetX, y: targetY } };
+                        }
+                    }
+                    return sprite;
+                })();
+                return updatedSprite;
+            }
+            return sprite;
+        })
     );
   };
 
   const deleteSprite = (spriteId) => {
+    if (cancellationRefs.current[spriteId] !== undefined) {
+      cancellationRefs.current[spriteId] = true;
+      delete cancellationRefs.current[spriteId];
+    }
     setSprites((prevSprites) => prevSprites.filter((sprite) => sprite.id !== spriteId));
-
     if (selectedSpriteId === spriteId) {
       setSelectedSpriteId(null);
     }
   };
 
-  const handlePlayClick = () => {
+  const handlePlayClick = async () => {
+    Object.keys(cancellationRefs.current).forEach((id) => {
+      cancellationRefs.current[id] = true;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    setSprites((prevSprites) =>
+      prevSprites.map((sprite) => {
+        const assignedAction = actionSections.find(
+          (action) => action.id === sprite.assignedAction
+        );
+        const updatedCommands = assignedAction?.commands || [];
+        return {
+          ...sprite,
+          commands: updatedCommands,
+          isExecuting: updatedCommands.length > 0,
+        };
+      })
+    );
     sprites.forEach((sprite) => {
-      if (sprite.commands && sprite.commands.length > 0) {
+      if (sprite.commands.length > 0) {
         executeCommandsSequentially(sprite.id, sprite.commands);
       }
     });
-  };
-
+  };  
+  
   const assignActionToSprite = (spriteId, actionId) => {
     const action = actionSections.find((action) => action.id === actionId);
     if (!action) {
-      console.error(`Action with ID ${actionId} not found.`);
       return;
     }
     setSprites((prevSprites) =>
