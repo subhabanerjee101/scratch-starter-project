@@ -66,16 +66,16 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
       scale: 1,
       initialScale: 1,
       isExecuting: false,
+      isColliding: false,
       assignedAction: null,
       commands: [],
     };
     setSprites((prevSprites) => [...prevSprites, newSprite]);
     cancellationRefs.current[newSprite.id] = false;
+    setSelectedSpriteId(newSprite.id);
     setShowSpriteMenu(false);
-  };
+  };  
   
-  
-
   const isColliding = (sprite1, sprite2) => {
     if (
       sprite1.position.x === 0 &&
@@ -108,34 +108,48 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
   const executeCommandsSequentially = async (spriteId, commands) => {
     const sprite = sprites.find((sprite) => sprite.id === spriteId);
     if (!sprite || !commands || commands.length === 0) {
-        return;
+      return;
     }
-    cancellationRefs.current[spriteId] = false;
+    const currentRunId = Date.now();
+    cancellationRefs.current[spriteId] = currentRunId;
     setSprites((prevSprites) =>
-        prevSprites.map((s) =>
-            s.id === spriteId ? { ...s, isExecuting: true } : s
-        )
+      prevSprites.map((s) =>
+        s.id === spriteId ? { ...s, isExecuting: true } : s
+      )
     );
     let index = 0;
-    while (!cancellationRefs.current[spriteId]) {
-        const command = commands[index];
-        processCommand(command, spriteId);
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        const hasRepeatTile = commands.some((cmd) => cmd.label === "Repeat Animation");
-        if (command.label === "Repeat Animation" && !hasRepeatTile) {
-            break;
-        }
-        index = (index + 1) % commands.length;
-        if (!hasRepeatTile && index === 0) {
-            break;
-        }
+    while (cancellationRefs.current[spriteId] === currentRunId) {
+      const command = commands[index];
+      if (cancellationRefs.current[spriteId] !== currentRunId) {
+        break;
+      }
+      processCommand(command, spriteId);
+      await new Promise((resolve) => {
+        const timeout = setTimeout(() => {
+          if (cancellationRefs.current[spriteId] === currentRunId) {
+            resolve();
+          }
+          clearTimeout(timeout);
+        }, 700);
+      });
+      const isRepeatAnimation = command.label === "Repeat Animation";
+      const hasRepeatTile = commands.some((cmd) => cmd.label === "Repeat Animation");
+      if (isRepeatAnimation && !hasRepeatTile) {
+        break;
+      }
+      index = (index + 1) % commands.length;
+      if (!hasRepeatTile && index === 0) {
+        break;
+      }
     }
-    setSprites((prevSprites) =>
+    if (cancellationRefs.current[spriteId] === currentRunId) {
+      setSprites((prevSprites) =>
         prevSprites.map((s) =>
-            s.id === spriteId ? { ...s, isExecuting: false } : s
+          s.id === spriteId ? { ...s, isExecuting: false } : s
         )
-    );
-  };
+      );
+    }
+  };  
 
   const processCommand = (command, spriteId) => {
     setSprites((prevSprites) =>
@@ -255,6 +269,8 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
 
   const handleCollision = (sprite1, sprite2) => {
     const collisionKey = `${Math.min(sprite1.id, sprite2.id)}-${Math.max(sprite1.id, sprite2.id)}`;
+    cancellationRefs.current[sprite1.id] = null;
+    cancellationRefs.current[sprite2.id] = null;
     setSprites((prevSprites) =>
       prevSprites.map((sprite) => {
         if (sprite.id === sprite1.id || sprite.id === sprite2.id) {
@@ -265,37 +281,42 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     );
     setTimeout(() => {
       setSprites((prevSprites) =>
-        prevSprites.map((sprite) => ({ ...sprite, isColliding: false }))
+        prevSprites.map((sprite) => ({
+          ...sprite,
+          isColliding: false,
+        }))
       );
     }, 1000);
-    cancellationRefs.current[sprite1.id] = true;
-    cancellationRefs.current[sprite2.id] = true;
     const swappedCommands1 = [...sprite2.commands];
     const swappedCommands2 = [...sprite1.commands];
-    setSprites((prevSprites) =>
-      prevSprites.map((sprite) => {
-        if (sprite.id === sprite1.id) {
-          return { ...sprite, isExecuting: false, commands: swappedCommands1 };
-        }
-        if (sprite.id === sprite2.id) {
-          return { ...sprite, isExecuting: false, commands: swappedCommands2 };
-        }
-        return sprite;
-      })
-    );
     setTimeout(() => {
+      setSprites((prevSprites) =>
+        prevSprites.map((sprite) => {
+          if (sprite.id === sprite1.id) {
+            return { ...sprite, commands: swappedCommands1, isExecuting: false };
+          }
+          if (sprite.id === sprite2.id) {
+            return { ...sprite, commands: swappedCommands2, isExecuting: false };
+          }
+          return sprite;
+        })
+      );
       executeCommandsSequentially(sprite1.id, swappedCommands1);
       executeCommandsSequentially(sprite2.id, swappedCommands2);
-    }, 500);
-    setTimeout(() => {
-      setCollisionHandled((prev) => {
-        const updatedSet = new Set(prev);
-        updatedSet.delete(collisionKey);
-        return updatedSet;
-      });
-    }, 1000);
+      setTimeout(() => {
+        setCollisionHandled((prev) => {
+          const updatedSet = new Set(prev);
+          updatedSet.delete(collisionKey);
+          return updatedSet;
+        });
+      }, 1000);
+    }, 300);
   };
 
+  const handleSpriteInteraction = (spriteId) => {
+    setSelectedSpriteId(spriteId);
+  };  
+   
   useEffect(() => {
     setSprites((prevSprites) =>
       prevSprites.map((sprite) => {
@@ -410,7 +431,8 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
                   <SpriteComponent />
                 </div>
               }
-              onSelect={setSelectedSpriteId}
+              onSelect={() => handleSpriteInteraction(sprite.id)}
+              onDragStart={() => handleSpriteInteraction(sprite.id)}
             />
           );
         })}
