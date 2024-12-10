@@ -63,6 +63,8 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
       type: spriteType,
       position: { x: 0, y: 0 },
       angle: 0,
+      scale: 1,
+      initialScale: 1,
       isExecuting: false,
       assignedAction: null,
       commands: [],
@@ -71,6 +73,7 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     cancellationRefs.current[newSprite.id] = false;
     setShowSpriteMenu(false);
   };
+  
   
 
   const isColliding = (sprite1, sprite2) => {
@@ -117,7 +120,7 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     while (!cancellationRefs.current[spriteId]) {
         const command = commands[index];
         processCommand(command, spriteId);
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 700));
         const hasRepeatTile = commands.some((cmd) => cmd.label === "Repeat Animation");
         if (command.label === "Repeat Animation" && !hasRepeatTile) {
             break;
@@ -136,42 +139,66 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
 
   const processCommand = (command, spriteId) => {
     setSprites((prevSprites) =>
-        prevSprites.map((sprite) => {
-            if (sprite.id === spriteId) {
-                const updatedSprite = (() => {
-                    if (command.label.includes("Move") && command.label.includes("steps")) {
-                        const steps = parseInt(command.label.split(" ")[1], 10);
-                        if (!isNaN(steps)) {
-                            return {
-                                ...sprite,
-                                position: {
-                                    x: sprite.position.x + steps * Math.cos((sprite.angle * Math.PI) / 180),
-                                    y: sprite.position.y + steps * Math.sin((sprite.angle * Math.PI) / 180),
-                                },
-                            };
-                        }
-                    } else if (command.label.includes("Turn") && command.extraText?.includes("degrees")) {
-                        const degrees = parseInt(command.extraText.split(" ")[0], 10);
-                        if (!isNaN(degrees)) {
-                            const newAngle =
-                                command.iconName === "undo"
-                                    ? sprite.angle - degrees
-                                    : sprite.angle + degrees;
-                            return { ...sprite, angle: newAngle };
-                        }
-                    } else if (command.label.includes("Go to")) {
-                        const targetX = parseInt(command.x, 10);
-                        const targetY = parseInt(command.y, 10);
-                        if (!isNaN(targetX) && !isNaN(targetY)) {
-                            return { ...sprite, position: { x: targetX, y: targetY } };
-                        }
-                    }
-                    return sprite;
-                })();
-                return updatedSprite;
+      prevSprites.map((sprite) => {
+        if (sprite.id === spriteId) {
+          const updatedSprite = (() => {
+            if (command.label.includes("Move") && command.label.includes("steps")) {
+              const steps = parseInt(command.label.split(" ")[1], 10);
+              if (!isNaN(steps)) {
+                return {
+                  ...sprite,
+                  position: {
+                    x: sprite.position.x + steps * Math.cos((sprite.angle * Math.PI) / 180),
+                    y: sprite.position.y + steps * Math.sin((sprite.angle * Math.PI) / 180),
+                  },
+                };
+              }
+            } else if (command.label.includes("Turn") && command.extraText?.includes("degrees")) {
+              const degrees = parseInt(command.extraText.split(" ")[0], 10);
+              if (!isNaN(degrees)) {
+                const newAngle =
+                  command.iconName === "undo"
+                    ? sprite.angle - degrees
+                    : sprite.angle + degrees;
+                return { ...sprite, angle: newAngle };
+              }
+            } else if (command.label === "Go to Random Position") {
+              const randomX = Math.floor(Math.random() * 300) - 150;
+              const randomY = Math.floor(Math.random() * 300) - 150;
+              return { ...sprite, position: { x: randomX, y: randomY } };
+            } else if (command.label === "Say Hello") {
+              setTimeout(() => {
+                setSprites((s) =>
+                  s.map((sp) =>
+                    sp.id === spriteId ? { ...sp, saying: null } : sp
+                  )
+                );
+              }, 2000);
+              return { ...sprite, saying: "Hello" };
+            }else if (command.label === "Increase Size") {
+              return { 
+                ...sprite, 
+                scale: sprite.scale + 0.2 * sprite.initialScale
+              };
+            } else if (command.label === "Decrease Size") {
+              return { 
+                ...sprite, 
+                scale: sprite.scale - 0.2 * sprite.initialScale
+              };
+            }
+             else if (command.label.includes("Go to")) {
+              const targetX = parseInt(command.x, 10);
+              const targetY = parseInt(command.y, 10);
+              if (!isNaN(targetX) && !isNaN(targetY)) {
+                return { ...sprite, position: { x: targetX, y: targetY } };
+              }
             }
             return sprite;
-        })
+          })();
+          return updatedSprite;
+        }
+        return sprite;
+      })
     );
   };
 
@@ -324,11 +351,12 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
           isExecuting: false,
           assignedAction: null,
           commands: [],
+          scale: 1,
         }))
       );
       setCollisionHandled(new Set());
     }
-  }, [reset]);
+  }, [reset]);  
 
   const [, drop] = useDrop({
     accept: "SPRITE",
@@ -366,10 +394,19 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
               sprite={sprite}
               component={
                 <div
-                  className={`relative ${
-                    sprite.isColliding ? "animate-pulse" : ""
-                  }`}
+                  className={`relative ${sprite.isColliding ? "animate-pulse" : ""}`}
+                  style={{
+                    transform: `scale(${sprite.scale || 1})`,
+                  }}
                 >
+                  {sprite.saying && (
+                    <div
+                      className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white px-2 py-1 rounded-lg shadow-md"
+                      style={{ fontSize: "12px", whiteSpace: "nowrap" }}
+                    >
+                      {sprite.saying}
+                    </div>
+                  )}
                   <SpriteComponent />
                 </div>
               }

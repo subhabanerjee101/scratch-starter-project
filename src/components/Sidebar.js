@@ -45,9 +45,14 @@ export default function Sidebar() {
         extraText="15 degrees"
       />
       <DraggableBlock label="Go to x: 50 y: 50" x={50} y={50} />
-
+      <DraggableBlock label="Go to Random Position" />
+      <div className="font-bold text-lg text-gray-800 mt-6 mb-4">{"Looks"}</div>
+      <DraggableBlock label="Say Hello" />
       <div className="font-bold text-lg text-gray-800 mt-6 mb-4">{"Control"}</div>
       <DraggableBlock label="Repeat Animation" />
+      <div className="font-bold text-lg text-gray-800 mt-6 mb-4">{"Size"}</div>
+      <DraggableBlock label="Increase Size" />
+      <DraggableBlock label="Decrease Size" />
     </div>
   );
 }

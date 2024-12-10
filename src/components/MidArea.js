@@ -22,10 +22,7 @@ function ActionSection({ section, setCommandsForActionSection }) {
   const [, drop] = useDrop({
     accept: "BLOCK",
     drop: (block) => {
-      setCommandsForActionSection(section.id, [
-        ...section.commands,
-        block,
-      ]);
+      setCommandsForActionSection(section.id, [...section.commands, block]);
     },
     collect: (monitor) => setIsOver(!!monitor.isOver()),
   });
@@ -68,7 +65,7 @@ function ActionSection({ section, setCommandsForActionSection }) {
             <div
               key={index}
               className="flex justify-between items-center bg-gray-100 p-3 rounded-lg shadow-sm border hover:bg-gray-50 transition"
-              >
+            >
               <div className="text-sm font-medium text-gray-700">
                 <span className="font-bold flex items-center space-x-2">
                   {block.label.includes("Move") && block.label.includes("steps") ? (
@@ -84,20 +81,32 @@ function ActionSection({ section, setCommandsForActionSection }) {
                       />
                       <span>steps</span>
                     </>
+                  ) : block.label === "Go to Random Position" ? (
+                    <span>Go to a Random Position</span>
+                  ) : block.label === "Say Hello" ? (
+                    <span>Say Hello</span>
+                  ) : block.label === "Increase Size" ? (
+                    <span>Increase Size by 20%</span>
+                  ) : block.label === "Decrease Size" ? (
+                    <span>Decrease Size by 20%</span>
                   ) : block.label.includes("Go to") && block.label.includes("x:") ? (
                     <>
                       <span>Go to x:</span>
                       <input
                         type="number"
                         value={block.x || 0}
-                        onChange={(e) => handleEdit(index, "x", parseInt(e.target.value, 10))}
+                        onChange={(e) =>
+                          handleEdit(index, "x", parseInt(e.target.value, 10))
+                        }
                         className="w-12 border rounded text-center"
                       />
                       <span>y:</span>
                       <input
                         type="number"
                         value={block.y || 0}
-                        onChange={(e) => handleEdit(index, "y", parseInt(e.target.value, 10))}
+                        onChange={(e) =>
+                          handleEdit(index, "y", parseInt(e.target.value, 10))
+                        }
                         className="w-12 border rounded text-center"
                       />
                     </>
