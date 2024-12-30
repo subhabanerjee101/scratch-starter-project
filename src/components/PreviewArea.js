@@ -6,6 +6,7 @@ import MouseSprite from "./MouseSprite";
 import Icon from "./Icon";
 import DraggableSprite from "./DraggableSprite";
 
+const GUTTER_SIZE = 100;
 const spriteComponents = {
   Cat: CatSprite,
   Ball: BallSprite,
@@ -39,8 +40,8 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     if (offset && previewAreaRect) {
       const centerX = previewAreaRect.width / 2;
       const centerY = previewAreaRect.height / 2;
-      setSprites((prevSprites) =>
-        prevSprites.map((sprite) =>
+      setSprites((prevSprites) => {
+        const updatedSprites = prevSprites.map((sprite) =>
           sprite.id === spriteId
             ? {
                 ...sprite,
@@ -50,18 +51,44 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
                 },
               }
             : sprite
-        )
-      );
+        );
+        const resolvedSprites = resolveCollisions(updatedSprites);
+        return resolvedSprites;
+      });        
     }
   };
 
   const addSprite = (spriteType) => {
-    const existingCount = sprites.filter((sprite) => sprite.type === spriteType).length;
+    const existingCount = sprites.length;
+    const randomDirection = () => (Math.random() > 0.5 ? 1 : -1);
+    const findValidPosition = (existingSprites) => {
+      let validPositionFound = false;
+      let newX = 0;
+      let newY = 0;
+      while (!validPositionFound) {
+        newX = randomDirection() * Math.floor(Math.random() * GUTTER_SIZE) * 2;
+        newY = randomDirection() * Math.floor(Math.random() * GUTTER_SIZE) * 2;
+        validPositionFound = existingSprites.every((sprite) => {
+          const dx = newX - sprite.position.x;
+          const dy = newY - sprite.position.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          return distance >= GUTTER_SIZE;
+        });
+      }
+      return { x: newX, y: newY };
+    };
+    let newX = 0;
+    let newY = 0;
+    if (existingCount > 0) {
+      const { x, y } = findValidPosition(sprites);
+      newX = x;
+      newY = y;
+    }
     const newSprite = {
       id: Date.now(),
       name: `${spriteType} ${existingCount + 1}`,
       type: spriteType,
-      position: { x: 0, y: 0 },
+      position: { x: newX, y: newY },
       angle: 0,
       scale: 1,
       initialScale: 1,
@@ -70,7 +97,11 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
       assignedAction: null,
       commands: [],
     };
-    setSprites((prevSprites) => [...prevSprites, newSprite]);
+    setSprites((prevSprites) => {
+      const updatedSprites = [...prevSprites, newSprite];
+      const resolvedSprites = resolveCollisions(updatedSprites);
+      return resolvedSprites;
+    });
     cancellationRefs.current[newSprite.id] = false;
     setSelectedSpriteId(newSprite.id);
     setShowSpriteMenu(false);
@@ -104,6 +135,34 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
       rect1.top > rect2.bottom
     );
   };
+
+  const resolveCollisions = (sprites) => {
+    const adjustedSprites = [...sprites];
+    for (let i = 0; i < adjustedSprites.length; i++) {
+      for (let j = i + 1; j < adjustedSprites.length; j++) {
+        const sprite1 = adjustedSprites[i];
+        const sprite2 = adjustedSprites[j];
+        if (sprite1.isExecuting || sprite2.isExecuting) {
+          continue;
+        }
+        if (isColliding(sprite1, sprite2)) {
+          const dx = sprite2.position.x - sprite1.position.x;
+          const dy = sprite2.position.y - sprite1.position.y;
+          const distance = Math.sqrt(dx * dx + dy * dy) || 1;
+          const overlap = GUTTER_SIZE - distance;
+          if (overlap > 0) {
+            const adjustmentX = (overlap / 2) * (dx / distance);
+            const adjustmentY = (overlap / 2) * (dy / distance);
+            sprite1.position.x -= adjustmentX;
+            sprite1.position.y -= adjustmentY;
+            sprite2.position.x += adjustmentX;
+            sprite2.position.y += adjustmentY;
+          }
+        }
+      }
+    }
+    return adjustedSprites;
+  };  
 
   const executeCommandsSequentially = async (spriteId, commands) => {
     const sprite = sprites.find((sprite) => sprite.id === spriteId);
@@ -152,8 +211,8 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
   };  
 
   const processCommand = (command, spriteId) => {
-    setSprites((prevSprites) =>
-      prevSprites.map((sprite) => {
+    setSprites((prevSprites) => {
+      const updatedSprites = prevSprites.map((sprite) => {
         if (sprite.id === spriteId) {
           const updatedSprite = (() => {
             if (command.label.includes("Move") && command.label.includes("steps")) {
@@ -189,7 +248,7 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
                 );
               }, 2000);
               return { ...sprite, saying: "Hello" };
-            }else if (command.label === "Increase Size") {
+            } else if (command.label === "Increase Size") {
               return { 
                 ...sprite, 
                 scale: sprite.scale + 0.2 * sprite.initialScale
@@ -212,8 +271,10 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
           return updatedSprite;
         }
         return sprite;
-      })
-    );
+      });
+      const resolvedSprites = resolveCollisions(updatedSprites);
+      return resolvedSprites;
+    });
   };
 
   const deleteSprite = (spriteId) => {
@@ -281,10 +342,12 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
     );
     setTimeout(() => {
       setSprites((prevSprites) =>
-        prevSprites.map((sprite) => ({
-          ...sprite,
-          isColliding: false,
-        }))
+        prevSprites.map((sprite) => {
+          if (sprite.id === sprite1.id || sprite.id === sprite2.id) {
+            return { ...sprite, isColliding: false };
+          }
+          return sprite;
+        })
       );
     }, 1000);
     const swappedCommands1 = [...sprite2.commands];
@@ -311,7 +374,7 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
         });
       }, 1000);
     }, 300);
-  };
+  };  
 
   const handleSpriteInteraction = (spriteId) => {
     setSelectedSpriteId(spriteId);
@@ -356,6 +419,13 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
   
     if (sprites.length > 1) {
       detectCollisions();
+      const resolvedSprites = resolveCollisions(sprites);
+      setSprites((prevSprites) => {
+        if (JSON.stringify(prevSprites) !== JSON.stringify(resolvedSprites)) {
+          return resolvedSprites;
+        }
+        return prevSprites;
+      });
     }
   }, [sprites]);
 
@@ -364,20 +434,57 @@ const PreviewArea = forwardRef(({ reset, handleReset, actionSections }, ref) => 
       Object.keys(cancellationRefs.current).forEach((id) => {
         cancellationRefs.current[id] = true;
       });
-      setSprites((prevSprites) =>
-        prevSprites.map((sprite) => ({
-          ...sprite,
-          position: { x: 0, y: 0 },
-          angle: 0,
-          isExecuting: false,
-          assignedAction: null,
-          commands: [],
-          scale: 1,
-        }))
-      );
+  
+      setSprites((prevSprites) => {
+        const resetSprites = prevSprites.map((sprite, index) => {
+          if (index === 0) {
+            return {
+              ...sprite,
+              position: { x: 0, y: 0 },
+              angle: 0,
+              isExecuting: false,
+              assignedAction: null,
+              commands: [],
+              scale: 1,
+            };
+          }
+          const findValidPosition = (existingSprites) => {
+            let validPositionFound = false;
+            let newX = 0;
+            let newY = 0;
+            while (!validPositionFound) {
+              const randomDirection = () => (Math.random() > 0.5 ? 1 : -1);
+              newX = randomDirection() * Math.floor(Math.random() * GUTTER_SIZE) * 2;
+              newY = randomDirection() * Math.floor(Math.random() * GUTTER_SIZE) * 2;
+              validPositionFound = existingSprites.every((existingSprite) => {
+                const dx = newX - existingSprite.position.x;
+                const dy = newY - existingSprite.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance >= GUTTER_SIZE;
+              });
+            }
+            return { x: newX, y: newY };
+          };
+          const validPosition = findValidPosition(
+            prevSprites.slice(0, index).map((s) => ({
+              position: s.position,
+            }))
+          );
+          return {
+            ...sprite,
+            position: validPosition,
+            angle: 0,
+            isExecuting: false,
+            assignedAction: null,
+            commands: [],
+            scale: 1,
+          };
+        });
+        return resetSprites;
+      });
       setCollisionHandled(new Set());
     }
-  }, [reset]);  
+  }, [reset]);
 
   const [, drop] = useDrop({
     accept: "SPRITE",
